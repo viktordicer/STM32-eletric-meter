@@ -24,6 +24,10 @@
 #include <ssd1306.h>
 #include <nano_gfx.h>
 #include "configuration.h"
+#include "electric_phase.h"
+
+//#define DEBUG
+//#define DISPLAY
 
 
 // Methodes
@@ -34,9 +38,6 @@ void L1_interr();
 void L2_interr();
 void L3_interr();
 double power_W(uint32_t delta_phase_count);
-double consumption_kWh(uint32_t delta_phase_count);
-
-void maxCount(uint32_t phase_count, int phase);
 
 void dataToChar();
 void countScreen();
@@ -53,18 +54,11 @@ IPAddress ip(IP_ADDRESS[0], IP_ADDRESS[1], IP_ADDRESS[2], IP_ADDRESS[3]);       
 EthernetClient ethClient;
 PubSubClient mqttClient(ethClient);
 
+ElectricPhase l1(INTERRUPT_L1);
+ElectricPhase l2(INTERRUPT_L2);
+ElectricPhase l3(INTERRUPT_L3);
+
 // VARIABLES
-uint32_t L1_count = 0;
-uint32_t L2_count = 0;
-uint32_t L3_count = 0;
-
-char L1_count_char[50];
-char L2_count_char[50];
-char L3_count_char[50];
-
-uint32_t last_L1_count = 0;
-uint32_t last_L2_count = 0;
-uint32_t last_L3_count = 0;
 
 double powerL1 = 0.00; // power L1 phase in W
 double powerL2 = 0.00; // power L2 phase in W
@@ -96,7 +90,7 @@ char consumL3_mqtt_char[15]; //L3 char consumption increment
 
 int connection_failed = 0;
 bool mqtt_conn = false;
-char connection_failed_char[10];
+char connection_failed_char[15];
 
 // OLED VARIABLES
 int screen = 0;
@@ -107,23 +101,24 @@ uint32_t last_time_measure =  0;
 uint32_t last_time_screen =  0;
 uint32_t last_consum_mqtt =  0;
 
+
+
 // ------------------ SETUP ---------------------------------------------------------
 void setup() {
-
-  //Serial.begin(57600);
-  //Serial.println("STM32 strarting...");
-
-  pinMode(INTERRUPT_L1, INPUT);
-  pinMode(INTERRUPT_L2, INPUT);
-  pinMode(INTERRUPT_L3, INPUT);
+  #ifdef DEBUG
+    Serial.begin(57600);
+    Serial.println("STM32 strarting...");
+  #endif //DEBUG
 
   attachInterrupt(digitalPinToInterrupt(PB15),L1_interr, RISING); // interrupt for L1 phase
   attachInterrupt(digitalPinToInterrupt(PB14),L2_interr, RISING); // interrupt for L2 phase
   attachInterrupt(digitalPinToInterrupt(PB13),L3_interr, RISING); // interrupt for L3 phase
 
-  ssd1306_setFixedFont(ssd1306xled_font6x8);
-  ssd1306_128x64_i2c_init();
-  ssd1306_clearScreen();
+  #ifdef DISPLAY
+    ssd1306_setFixedFont(ssd1306xled_font6x8);
+    ssd1306_128x64_i2c_init();
+    ssd1306_clearScreen();
+  #endif //DISPLAY
 
   Ethernet.begin(MAC);
   delay(1000);
@@ -137,37 +132,30 @@ void loop() {
 
   time = millis();
 
-  if(time-last_time_screen > SCREEN_INTERVAL){
-    //OLED DISPLAY
-    switch(screen){
-      case 0:
-        countScreen();
-        screen = 1;
-        break;
-      case 1:
-        powerScreen();
-        screen = 2;
-        break;
-      case 2:
-        consumptionScreen();
-        screen = 0;
-        break;
+  #ifdef DISPLAY
+    if(time-last_time_screen > SCREEN_INTERVAL){
+      //OLED DISPLAY
+      switch(screen){
+        case 0:
+          countScreen();
+          screen = 1;
+          break;
+        case 1:
+          powerScreen();
+          screen = 2;
+          break;
+        case 2:
+          consumptionScreen();
+          screen = 0;
+          break;
+      }
+      last_time_screen = time;
     }
-    last_time_screen = time;
-  }
+  #endif //DISPLAY
 
   if(time-last_time_measure > MEASURE_INTERVAL){
 
     powerSolve();
-    //serialPrint();
-
-    maxCount(L1_count,1);
-    maxCount(L2_count,2);
-    maxCount(L3_count,3);
-
-    last_L1_count = L1_count;
-    last_L2_count = L2_count;
-    last_L3_count = L3_count;
 
     last_time_measure = time;
     dataToChar(); // all data conversion to char for mqtt and screen
@@ -294,13 +282,6 @@ void ethernetReset() {
 }
 
 
-void ethernetTurnoff(){
-
-  pinMode(RESET_PIN, OUTPUT);
-  digitalWrite(RESET_PIN, LOW);
-  //Serial.println("Ethernet adapter has turned off");
-}
-
 
 void serialPrint(){
   /*Serial.print("L1 power in W: ");
@@ -320,52 +301,26 @@ void serialPrint(){
 // *FLOW COMPUTING -------------------------------------------------------
 // increment L1 phase pulses
 void L1_interr() {
-  L1_count ++ ;
+  l1.addCount() ;
 }
 // increment L2 phase pulses
 void L2_interr() {
-  L2_count ++ ;
+  l2.addCount();
 }
 // increment L3 phase pulses
 void L3_interr() {
-  L3_count ++ ;
-}
-
-
-double power_W(uint32_t delta_phase_count) {
-  double pwr = 0;
-  pwr = (delta_phase_count / IMPULSE_CONSTANT  / (time - last_time_measure)) * 1000000 ;
-  return pwr;
-}
-
-double consumption_kWh(uint32_t delta_phase_count) {
-  double consum = 0;
-  consum = delta_phase_count / KWH_IMPULSES;
-  return consum;
-}
-
-void maxCount(uint32_t phase_count, int phase){
-  if (phase_count >= MAX_PHASE_COUNTS) {
-    switch(phase){
-      case 1:
-        L1_count -= MAX_PHASE_COUNTS ;
-      case 2:
-        L2_count -= MAX_PHASE_COUNTS ;
-      case 3:
-        L3_count -= MAX_PHASE_COUNTS ;
-    }
-  }
+  l3.addCount();
 }
 
 
 void powerSolve(){
-  powerL1 = power_W(L1_count - last_L1_count);
-  powerL2 = power_W(L2_count - last_L2_count);
-  powerL3 = power_W(L3_count - last_L3_count);
+  powerL1 = l1.getPower(time - last_time_measure);
+  powerL2 = l2.getPower(time - last_time_measure);
+  powerL3 = l3.getPower(time - last_time_measure);
 
-  consumptionL1_inc = consumption_kWh(L1_count - last_L1_count);
-  consumptionL2_inc = consumption_kWh(L2_count - last_L2_count);
-  consumptionL3_inc = consumption_kWh(L3_count - last_L3_count);
+  consumptionL1_inc = l1.getConsumption();
+  consumptionL2_inc = l2.getConsumption();
+  consumptionL3_inc = l3.getConsumption();
 
   consumptionL1 += consumptionL1_inc;
   consumptionL2 += consumptionL2_inc;
@@ -376,13 +331,9 @@ void powerSolve(){
   consumL3_mqtt += consumptionL3_inc;
 }
 
-// *------------------------  OLED DISPLAY -------------------------------------------------------
+
 void dataToChar(){
   double consum_scale = 100.0;
-
-  sprintf(L1_count_char, "%lu", L1_count);
-  sprintf(L2_count_char, "%lu", L2_count);
-  sprintf(L3_count_char, "%lu", L3_count);
 
   dtostrf(powerL1, 5, 1, powerL1_char);
   dtostrf(powerL2, 5, 1, powerL2_char);
@@ -399,6 +350,9 @@ void dataToChar(){
   sprintf(connection_failed_char, "%i", connection_failed);
 }
 
+
+
+// * ------------ DISPLAY SCREEN  ----------------
 
 void countScreen(){
   ssd1306_setFixedFont(ssd1306xled_font6x8);
