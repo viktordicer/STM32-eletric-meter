@@ -21,7 +21,7 @@ uint32_t ElectricPhase::getCount(){
 }
 
 // Clear all impulses. The function has to be called after measurement.
-void ElectricPhase::clear(){
+void ElectricPhase::clearCount(){
   this->count = 0;
 }
 

@@ -22,7 +22,4 @@ private:
   double w_impulses = 0.55556; // 0,5556 impulses per second => 1 000 W
 };
 
-
-
-
 #endif //_ELECTRICPHASE_H_
