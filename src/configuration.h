@@ -22,10 +22,6 @@ uint8_t MAC[6] =          {0x02, 0x06, 0xA4, 0x01, 0x04, 0x06};
 #define L2_POWER_TOPIC              "sensor/foyer/L2_power"
 #define L3_POWER_TOPIC              "sensor/foyer/L3_power"
 
-#define L1_CONSUM_TOPIC              "sensor/foyer/L1_consum"
-#define L2_CONSUM_TOPIC              "sensor/foyer/L2_consum"
-#define L3_CONSUM_TOPIC              "sensor/foyer/L3_consum"
-
 #define L1_CONSUM_INC_TOPIC          "sensor/foyer/L1_con_inc"
 #define L2_CONSUM_INC_TOPIC          "sensor/foyer/L2_con_inc"
 #define L3_CONSUM_INC_TOPIC          "sensor/foyer/L3_con_inc"
@@ -35,15 +31,6 @@ uint8_t MAC[6] =          {0x02, 0x06, 0xA4, 0x01, 0x04, 0x06};
 #define MAX_PHASE_COUNTS   20000 //reset phase count after reach max
 
 // TIME VARIABLES
-#define MQTT_SENDING_DEALY            20 // mqtt delay between publish
+#define MQTT_SENDING_DEALY            10 // mqtt delay between publish
 #define MEASURE_INTERVAL              120000 // delay in ms
-#define SCREEN_INTERVAL               5000 // delay in ms
-#define CONSUMPTION_INTERVAL          1200000 // delay in ms 30 min
-//valve states array
-
-// conversion variables
-#define KWH_IMPULSES    2000.0    // conversion value 1 KW/h => 2 000 impulses
-#define IMPULSE_CONSTANT  0.55556    // 0,5556 ipm/s => 1 000 W
-
-//Failure variables
  
