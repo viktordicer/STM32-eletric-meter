@@ -31,6 +31,5 @@ uint8_t MAC[6] =          {0x02, 0x06, 0xA4, 0x01, 0x04, 0x06};
 #define MAX_PHASE_COUNTS   20000 //reset phase count after reach max
 
 // TIME VARIABLES
-#define MQTT_SENDING_DEALY            10 // mqtt delay between publish
-#define MEASURE_INTERVAL              120000 // delay in ms
- 
+#define MQTT_SENDING_DEALY            20 // mqtt delay between publish
+#define MEASURE_INTERVAL              360000 // delay in ms
