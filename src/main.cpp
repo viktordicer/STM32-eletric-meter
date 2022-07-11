@@ -21,12 +21,8 @@
 #include <Arduino.h>
 #include <Ethernet.h>  //ETHERNET LIBRARY
 #include <PubSubClient.h> //MQTT LIBRARY
-//#include <ssd1306.h>
-//#include <nano_gfx.h>
 #include "configuration.h"
 #include "electric_phase.h"
-
-//#define DEBUG
 
 // Methodes
 void ethernetReset();
@@ -39,7 +35,6 @@ double power_W(uint32_t delta_phase_count);
 void dataToChar();
 void powerComputing();
 void sendData();
-void serialPrint(String message);
 
 //------------------------- Program variables
 //NEW Objects
@@ -86,10 +81,6 @@ uint32_t last_time_measure =  0;
 
 // ------------------ SETUP ---------------------------------------------------------
 void setup() {
-  #ifdef DEBUG
-    Serial.begin(57600);
-    Serial.println("STM32 strarting...");
-  #endif //DEBUG
 
   attachInterrupt(digitalPinToInterrupt(PB15),L1_interr, RISING); // interrupt for L1 phase
   attachInterrupt(digitalPinToInterrupt(PB14),L2_interr, RISING); // interrupt for L2 phase
@@ -115,10 +106,7 @@ void loop() {
       ethernetReset();
     }
     if(!mqttClient.connected()){
-      serialPrint("MQTT connection is killed.");
       mqttConnection();
-    }else{
-      serialPrint("MQTT connection is still alive.");
     }
     sendData(); 
     mqttClient.loop();
@@ -157,16 +145,12 @@ void mqttConnection() {
         ethernetReset();
         connection_failed ++;
         mqtt_conn = false;
-        serialPrint("Can't connect to the mqtt.");
         return;
       }
-      serialPrint("Attempting MQTT connection...");
 
       if (mqttClient.connect(MQTT_CLIENT_ID, USERNAME, PASSWORD )) {
-        serialPrint("MQTT connected");
         mqtt_conn = true;
       } else {
-        serialPrint(" try again in 2 seconds");
         delay(1000);
         connectionAtempt ++;
       }
@@ -177,7 +161,6 @@ void mqttConnection() {
 
 // Physically reset ethernet adapter. Need to call befor mqtt connection
 void ethernetReset() {
-  serialPrint("Reseting ethernet adapter");
   pinMode(RESET_PIN, OUTPUT);
   digitalWrite(RESET_PIN, LOW);
   delay(100);
@@ -185,7 +168,6 @@ void ethernetReset() {
   delay(100);
   pinMode(RESET_PIN, INPUT);
   delay(100);
-  serialPrint("Initialize ethernet");
   Ethernet.begin(MAC); //, ip);
 
   //delay with ethernet maintain
@@ -240,11 +222,4 @@ void dataToChar(){
   dtostrf(consumL2_mqtt * consum_scale, 4, 3, consumL2_mqtt_char);
   dtostrf(consumL3_mqtt * consum_scale, 4, 3, consumL3_mqtt_char);
   sprintf(connection_failed_char, "%i", connection_failed);
-}
-
-// Serial print if debug mode is on
-void serialPrint(String message){
-  #ifdef DEBUG
-    Serial.println(message);
-  #endif
 }
