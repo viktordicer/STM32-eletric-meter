@@ -189,6 +189,10 @@ void sendData(){
     consumL1_mqtt = 0;
     consumL2_mqtt = 0;
     consumL3_mqtt = 0;
+
+    consumL1_oven_mqtt = 0;
+    consumL2_refri_mqtt = 0;
+    consumL3_dish_mqtt = 0;
   }
 }
 // *SENDING DATA -------------------------------------------------------
