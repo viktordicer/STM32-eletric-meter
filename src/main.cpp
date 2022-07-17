@@ -120,7 +120,7 @@ void setup() {
 
   attachInterrupt(digitalPinToInterrupt(PA12),L1_oven_interr, RISING); // interrupt for L1 phase
   attachInterrupt(digitalPinToInterrupt(PA11),L2_refrigerator_interr, RISING); // interrupt for L2 phase
-  attachInterrupt(digitalPinToInterrupt(PB10),L3_dishwasher_interr, RISING); // interrupt for L3 phase
+  attachInterrupt(digitalPinToInterrupt(PA10),L3_dishwasher_interr, RISING); // interrupt for L3 phase
 
   Ethernet.begin(MAC);
   delay(1500);
