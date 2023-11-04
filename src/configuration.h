@@ -9,7 +9,7 @@
 
 #define INTERRUPT_L1_OVEN         PA12 // internal circuit flow sensor
 #define INTERRUPT_L2_REFRIGERATOR PA11 // internal circuit flow sensor
-#define INTERRUPT_L3_DISHWASHER   PA10 // internal circuit flow sensor
+#define INTERRUPT_L3_DISHWASHER   PA9 // internal circuit flow sensor
 
 //ETHERNET ADDRESS
 int IP_ADDRESS[4] =        {192, 168, 0 , 175};
@@ -23,14 +23,33 @@ uint8_t MAC[6] =          {0x02, 0x06, 0xA4, 0x01, 0x04, 0x06};
 
 //TOPICS
 //Main phases
-#define L1_POWER_TOPIC              "sensor/foyer/L1_power"
-#define L2_POWER_TOPIC              "sensor/foyer/L2_power"
-#define L3_POWER_TOPIC              "sensor/foyer/L3_power"
+#define HA_TOPIC                     "homeassistant/status"
+#define POWER_TOPIC                  "sensor/foyer/power"
+#define STATUS_TOPIC                 "sensor/foyer/status"
 
-#define L1_OVEN_TOPIC                     "sensor/foyer/L1_oven"
-#define L2_REFRIGERATOR_TOPIC             "sensor/foyer/L2_refrigerator"
-#define L2_DISHWASHER_TOPIC               "sensor/foyer/L3_dishwasher"
+#define SET_L1_TOTAL_TOPIC           "sensor/foyer/set_L1" //set total consumption after restart
+#define SET_L2_TOTAL_TOPIC           "sensor/foyer/set_L2" //set total consumption after restart
+#define SET_L3_TOTAL_TOPIC           "sensor/foyer/set_L3" //set total consumption after restart
+#define SET_OVEN_TOTAL_TOPIC         "sensor/foyer/set_oven" //set total consumption after restart
+#define SET_REFRI_TOTAL_TOPIC        "sensor/foyer/set_refri" //set total consumption after restart
+#define SET_DISH_TOTAL_TOPIC         "sensor/foyer/set_dish" //set total consumption after restart
+#define SET_INTERVAL_TOPIC           "sensor/foyer/set_interval" //set total consumption after restart
 
+#define L1_POWER_TOPIC               "sensor/foyer/L1_power"
+#define L2_POWER_TOPIC               "sensor/foyer/L2_power"
+#define L3_POWER_TOPIC               "sensor/foyer/L3_power"
+
+#define L1_TOTAL_TOPIC               "sensor/foyer/L1_total"
+#define L2_TOTAL_TOPIC               "sensor/foyer/L2_total"
+#define L3_TOTAL_TOPIC               "sensor/foyer/L3_total"
+
+#define L1_OVEN_TOPIC                "sensor/foyer/L1_oven"
+#define L2_REFRIGERATOR_TOPIC        "sensor/foyer/L2_refrigerator"
+#define L2_DISHWASHER_TOPIC          "sensor/foyer/L3_dishwasher"
+
+#define L1_OVEN_TOTAL_TOPIC          "sensor/foyer/L1_oven_total"
+#define L2_REFRIGERATOR_TOTAL_TOPIC  "sensor/foyer/L2_refrigerator_total"
+#define L2_DISHWASHER_TOTAL_TOPIC    "sensor/foyer/L3_dishwasher_total"
 
 #define L1_CONSUM_INC_TOPIC          "sensor/foyer/L1_con_inc"
 #define L2_CONSUM_INC_TOPIC          "sensor/foyer/L2_con_inc"
@@ -38,13 +57,6 @@ uint8_t MAC[6] =          {0x02, 0x06, 0xA4, 0x01, 0x04, 0x06};
 
 #define L1_OVEN_INC_TOPIC            "sensor/foyer/L1_oven_inc"
 #define L2_REFRIGERATOR_INC_TOPIC    "sensor/foyer/L2_refrigerator_inc"
-#define L2_DISHWASHER_INC_TOPIC      "sensor/foyer/L3_dishwasher_inc"
+#define L3_DISHWASHER_INC_TOPIC      "sensor/foyer/L3_dishwasher_inc"
 
 #define FOYER_CONNECTION_FAILED      "sensor/foyer/connection_failed"
-
-//VARIABLES
-#define MAX_PHASE_COUNTS   20000 //reset phase count after reach max
-
-// TIME VARIABLES
-#define MQTT_SENDING_DEALY            20 // mqtt delay between publish
-#define MEASURE_INTERVAL              360000 // delay in ms

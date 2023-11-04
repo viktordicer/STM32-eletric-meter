@@ -17,7 +17,7 @@ void ElectricPhase::addCount(){
 
 // Get total impulses
 uint32_t ElectricPhase::getCount(){
-  return count;
+  return this->count;
 }
 
 // Clear all impulses. The function has to be called after measurement.
@@ -26,11 +26,36 @@ void ElectricPhase::clearCount(){
 }
 
 // Get consumption in kwh for phase
-double ElectricPhase::getConsumption(){
-  return count / kwh_impulses;
+double ElectricPhase::getConsumptionInctement(){
+  if(getCount() == 0){
+    return 0;
+  } else {
+    double increment = getCount() / kwh_impulses;
+    addIncrement(increment); // add increment to total consumption
+    return increment*100;
+  }
 }
 
 // Get power of time interval dt = time - last_time
 double ElectricPhase::getPower(uint32_t dt){
-  return (count / w_impulses / dt) * 1000000.0;
+  if(getCount() == 0){
+    return 0;
+  } else {
+    double value = (getCount()/ w_impulses / dt) * 1000000.0;
+    return value;
+  }
+}
+
+double ElectricPhase::getTotalConsumption(){
+  return this->total_consumption;
+}
+
+// Set total consumprion after restart
+void ElectricPhase::setTotalConsumption(double value){
+  this->total_consumption = value;
+}
+
+// PRIVATE
+void ElectricPhase::addIncrement(double increment){
+  this->total_consumption += increment;
 }
