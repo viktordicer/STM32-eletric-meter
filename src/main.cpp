@@ -8,6 +8,12 @@
     SI  ----> PA7
     RST ----> PA0
 
+  I2C EEPROM AT24C02
+    VCC ----> 5V
+    GND ----> GND
+    SCL ----> PB6    
+    SDA ----> PB7
+
   Phase interrupts
     l1 ----> PB15
     l2 ----> PB14
@@ -25,14 +31,15 @@
 #include <ArduinoJson.h>
 #include "configuration.h"
 #include "electric_phase.h"
-#include <math.h>
+#include "Wire.h"
+#include "I2C_eeprom.h"
 
 #define DEBUG
 
 #ifdef DEBUG
-  #define logln(x) Serial.println(x)
+  #define SerialPrint(x) Serial.println(x)
 #elif
-  #define logln(x)
+  #define SerialPrint(x)
 #endif
 
 // Methodes
@@ -42,12 +49,17 @@ void callback(char* topic, byte* payload, unsigned int length);
 void L1_interr();
 void L2_interr();
 void L3_interr();
+
 // appliances
 void L1_oven_interr();
 void L2_refrigerator_interr();
 void L3_dishwasher_interr();
 
 void sendData();
+double readEEprom(uint16_t memory_address);
+void updateEEprom(uint16_t memory_address, double energy);
+void readTotalConsumption();
+void updateTotalConsumption();
 
 //------------------------- Program variables
 //NEW Objects
@@ -60,18 +72,21 @@ ElectricPhase l2(INTERRUPT_L2);
 ElectricPhase l3(INTERRUPT_L3);
 
 ElectricPhase l1_oven(INTERRUPT_L1_OVEN);
-ElectricPhase l2_refrigerator(INTERRUPT_L2_REFRIGERATOR);
-ElectricPhase l3_dishwasher(INTERRUPT_L3_DISHWASHER);
+ElectricPhase l2_refri(INTERRUPT_L2_REFRIGERATOR);
+ElectricPhase l3_dish(INTERRUPT_L3_DISHWASHER);
+
+// EEPROM
+
+I2C_eeprom ee(0x50, I2C_DEVICESIZE_24LC16);
 
 // Failed
 int connection_failed = 0;
 bool mqtt_conn = false;
-char connection_failed_char[15];
 
 //TIME VARIABLES
 uint32_t time =  0;
 uint32_t last_time_measure =  0;
-uint32_t measure_interval  =  120000; // delay in ms
+uint32_t last_time_eeprom =  0;
 
 // ------------------ SETUP ---------------------------------------------------------
 void setup() {
@@ -85,20 +100,31 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(PA12),L1_oven_interr, FALLING); // interrupt for L1 phase
   attachInterrupt(digitalPinToInterrupt(PA11),L2_refrigerator_interr, FALLING); // interrupt for L2 phase
   attachInterrupt(digitalPinToInterrupt(PA9),L3_dishwasher_interr, FALLING); // interrupt for L3 phase
-
+  //EEPROM initialize
+  ee.begin();
+  //Ethernet
   Ethernet.begin(MAC);
   delay(1500);
+  //MQTT
   mqttClient.setBufferSize(512);
   mqttClient.setServer(MQTT_SERVER_IP,1883);
   mqttClient.setCallback(callback);
   mqttConnection();
-  logln("STM32 starting ......");
+  SerialPrint("STM32 starting ......");
+
+  //READ total walues from EEPROM from EEPROM
+  
 }
 
 // ------------------ LOOP ---------------------------------------------------------
 void loop() {
   Ethernet.maintain();
   
+  if(millis()-last_time_eeprom > eeprom_interval){
+    updateTotalConsumption();
+    last_time_eeprom = millis();
+  }
+
   if(millis()-last_time_measure > measure_interval){
     //CHECK MQTT CONNECTION IS ALIVE
     if(!mqttClient.connected()){
@@ -110,6 +136,65 @@ void loop() {
   mqttClient.loop();
 }
 
+// increment L1 phase pulses
+void L1_interr(){
+  l1.addCount();
+}
+// increment L2 phase pulses
+void L2_interr(){
+  l2.addCount();
+}
+// increment L3 phase pulses
+void L3_interr(){
+  l3.addCount();
+}
+// increment L1 oven phase pulses
+void L1_oven_interr(){
+  l1_oven.addCount();
+}
+// increment L2 refrigerator phase pulses
+void L2_refrigerator_interr(){
+  l2_refri.addCount();
+}
+// increment L3 dishwasheer phase pulses
+void L3_dishwasher_interr(){
+  l3_dish.addCount();
+}
+// read data from EEPROM return consumption
+double readEEprom(uint16_t memory_address){
+  double energy;
+  uint8_t buffer[4];
+  ee.readBlock(memory_address, buffer, 4);
+  memcpy((void *)&energy, buffer,4);
+  return energy; 
+}
+// write consumprion to EEPROM
+void updateEEprom(uint16_t memory_address, double energy){
+  uint8_t buffer[4];
+  memcpy( buffer,(void *)&energy, 4);
+  ee.writeBlock(memory_address, buffer, 4);
+}
+// Read all consumptions from EEPROM and set values
+void readTotalConsumption(){
+  l1.setTotalConsumption(readEEprom(EEPROM_ADDRESS[0]));
+  l2.setTotalConsumption(readEEprom(EEPROM_ADDRESS[1]));
+  l3.setTotalConsumption(readEEprom(EEPROM_ADDRESS[2]));
+
+  l1_oven.setTotalConsumption(readEEprom(EEPROM_ADDRESS[3]));
+  l2_refri.setTotalConsumption(readEEprom(EEPROM_ADDRESS[4]));
+  l3_dish.setTotalConsumption(readEEprom(EEPROM_ADDRESS[5]));
+}
+
+//Write all consumprions into EEPROM
+void updateTotalConsumption(){
+  updateEEprom(EEPROM_ADDRESS[0], l1.getTotalConsumption());
+  updateEEprom(EEPROM_ADDRESS[1], l2.getTotalConsumption());
+  updateEEprom(EEPROM_ADDRESS[2], l3.getTotalConsumption());
+
+  updateEEprom(EEPROM_ADDRESS[3], l1_oven.getTotalConsumption());
+  updateEEprom(EEPROM_ADDRESS[4], l2_refri.getTotalConsumption());
+  updateEEprom(EEPROM_ADDRESS[5], l3_dish.getTotalConsumption());
+}
 //MQTT - send data
 void sendData(){
   time = millis();
@@ -123,8 +208,8 @@ void sendData(){
 
   //APPLIANCES POWER
   payload["pL1_oven"] = int(l1_oven.getPower(delta_time));
-  payload["pL2_refri"] = int(l2_refrigerator.getPower(delta_time));
-  payload["pL3_dish"] = int(l3_dishwasher.getPower(delta_time));
+  payload["pL2_refri"] = int(l2_refri.getPower(delta_time));
+  payload["pL3_dish"] = int(l3_dish.getPower(delta_time));
 
   // MAIN INCREMENT
   payload["L1_inc"] = l1.getConsumptionInctement();
@@ -132,28 +217,28 @@ void sendData(){
   payload["L3_inc"] = l3.getConsumptionInctement();
 
   payload["conOven"] = l1_oven.getConsumptionInctement();
-  payload["conRefri"] = l2_refrigerator.getConsumptionInctement();
-  payload["conDish"] = l3_dishwasher.getConsumptionInctement();
+  payload["conRefri"] = l2_refri.getConsumptionInctement();
+  payload["conDish"] = l3_dish.getConsumptionInctement();
   //TOTAL CONSUMPTION
-  payload["tL1"] = round(l1.getTotalConsumption()*10)/10;
-  payload["tL2"] = round(l2.getTotalConsumption()*10)/10;
-  payload["tL3"] = round(l3.getTotalConsumption()*10)/10;
+  payload["tL1"] = l1.getTotalConsumption();
+  payload["tL2"] = l2.getTotalConsumption();
+  payload["tL3"] = l3.getTotalConsumption();
 
-  payload["tOven"] = round(l1_oven.getTotalConsumption()*10)/10;
-  payload["tRefri"] = round(l2_refrigerator.getTotalConsumption()*10)/10;
-  payload["tDish"] = round(l3_dishwasher.getTotalConsumption()*10)/10;
+  payload["tOven"] = l1_oven.getTotalConsumption();
+  payload["tRefri"] = l2_refri.getTotalConsumption();
+  payload["tDish"] = l3_dish.getTotalConsumption();
   payload["con_failed"] = connection_failed;
 
   serializeJson(payload, buffer);
   mqttClient.publish(POWER_TOPIC, buffer);
   
-  logln("Data sent.");
+  SerialPrint("Data sent.");
   l1.clearCount();
   l2.clearCount();
   l3.clearCount();
   l1_oven.clearCount();
-  l2_refrigerator.clearCount();
-  l3_dishwasher.clearCount();
+  l2_refri.clearCount();
+  l3_dish.clearCount();
   last_time_measure = time;
   
 }
@@ -162,7 +247,7 @@ void sendData(){
 // Connect to MQTT brocker. When not available, try connect 3x
 void mqttConnection() {
   int connectionAtempt = 1;
-  logln("MQTT conecting .....");
+  SerialPrint("MQTT conecting .....");
   if(!mqttClient.connected()){
     while (!mqttClient.connected()) {
       if(connectionAtempt > 3){
@@ -184,11 +269,11 @@ void mqttConnection() {
         mqttClient.subscribe(SET_INTERVAL_TOPIC);
         mqttClient.publish(STATUS_TOPIC, "online");
         mqtt_conn = true;
-        logln("MQTT connected");
+        SerialPrint("MQTT connected");
       } else {
         delay(1000);
         connectionAtempt ++;
-        logln("MQTT failed");
+        SerialPrint("MQTT failed");
       }
     }
   }
@@ -197,7 +282,7 @@ void mqttConnection() {
 
 // Physically reset ethernet adapter. Need to call befor mqtt connection
 void ethernetReset() {
-  logln("Ethernet resetting...");
+  SerialPrint("Ethernet resetting...");
   pinMode(RESET_PIN, OUTPUT);
   digitalWrite(RESET_PIN, LOW);
   delay(100);
@@ -209,32 +294,6 @@ void ethernetReset() {
   delay(1000);
   mqttClient.setServer(MQTT_SERVER_IP,1883);
   mqttClient.setCallback(callback);
-}
-
-// *FLOW COMPUTING -------------------------------------------------------
-// increment L1 phase pulses
-void L1_interr(){
-  l1.addCount();
-}
-// increment L2 phase pulses
-void L2_interr(){
-  l2.addCount();
-}
-// increment L3 phase pulses
-void L3_interr(){
-  l3.addCount();
-}
-// increment L1 oven phase pulses
-void L1_oven_interr(){
-  l1_oven.addCount();
-}
-// increment L2 refrigerator phase pulses
-void L2_refrigerator_interr(){
-  l2_refrigerator.addCount();
-}
-// increment L3 dishwasheer phase pulses
-void L3_dishwasher_interr(){
-  l3_dishwasher.addCount();
 }
 
 
@@ -273,11 +332,11 @@ void callback(char* topic, byte* payload, unsigned int length) {
   } else if(strcmp(topic,SET_REFRI_TOTAL_TOPIC)==0){
       payload[length] = '\0';
       String s = String((char*)payload);
-      l2_refrigerator.setTotalConsumption(s.toDouble());
+      l2_refri.setTotalConsumption(s.toDouble());
   } else if(strcmp(topic,SET_DISH_TOTAL_TOPIC)==0){
       payload[length] = '\0';
       String s = String((char*)payload);
-      l3_dishwasher.setTotalConsumption(s.toDouble());
+      l3_dish.setTotalConsumption(s.toDouble());
   } else if(strcmp(topic,SET_INTERVAL_TOPIC)==0){
       payload[length] = '\0';
       String s = String((char*)payload);

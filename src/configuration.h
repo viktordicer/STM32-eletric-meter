@@ -15,6 +15,13 @@
 int IP_ADDRESS[4] =        {192, 168, 0 , 175};
 uint8_t MAC[6] =          {0x02, 0x06, 0xA4, 0x01, 0x04, 0x06};
 
+//EEPROM MEMORY ADDRESS
+uint8_t EEPROM_ADDRESS[6] =          {0x00, 0x10, 0x20, 0x30, 0x40, 0x50};
+
+//TIME VARIABLES
+uint32_t measure_interval  =  120000; // delay in ms
+uint32_t eeprom_interval  =  1800000; // delay in ms
+
 //MQTT
 #define MQTT_SERVER_IP           "192.168.0.107"   // IP address of MQTT broker
 #define MQTT_CLIENT_ID           "Foyer_el_room" // require ID for MQTT client
