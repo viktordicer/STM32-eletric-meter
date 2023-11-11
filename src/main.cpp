@@ -33,6 +33,7 @@
 #include "electric_phase.h"
 #include "Wire.h"
 #include "I2C_eeprom.h"
+#include <math.h>
 
 #define DEBUG
 
@@ -41,7 +42,7 @@
 #elif
   #define SerialPrint(x)
 #endif
-
+#define ARDUINOJSON_USE_DOUBLE 0
 // Methodes
 void ethernetReset();
 void mqttConnection();
@@ -76,8 +77,8 @@ ElectricPhase l2_refri(INTERRUPT_L2_REFRIGERATOR);
 ElectricPhase l3_dish(INTERRUPT_L3_DISHWASHER);
 
 // EEPROM
-
-I2C_eeprom ee(0x50, I2C_DEVICESIZE_24LC16);
+TwoWire Wire1(PB7, PB6);
+I2C_eeprom ee(0x50, I2C_DEVICESIZE_24LC16, &Wire1);
 
 // Failed
 int connection_failed = 0;
@@ -90,9 +91,12 @@ uint32_t last_time_eeprom =  0;
 
 // ------------------ SETUP ---------------------------------------------------------
 void setup() {
-#ifdef DEBUG
-  Serial.begin(57600);
-#endif
+  pinMode(GREEN_LED, OUTPUT); // green LED on Blackpill
+  digitalWrite(GREEN_LED, HIGH); // 
+  delay(2000);
+  #ifdef DEBUG
+    Serial.begin(115200);
+  #endif
   attachInterrupt(digitalPinToInterrupt(PB15),L1_interr, FALLING); // interrupt for L1 phase
   attachInterrupt(digitalPinToInterrupt(PB14),L2_interr, FALLING); // interrupt for L2 phase
   attachInterrupt(digitalPinToInterrupt(PB13),L3_interr, FALLING); // interrupt for L3 phase
@@ -102,6 +106,11 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(PA9),L3_dishwasher_interr, FALLING); // interrupt for L3 phase
   //EEPROM initialize
   ee.begin();
+  if(! ee.isConnected()){
+    digitalWrite(GREEN_LED, LOW);
+  }
+  readTotalConsumption();
+
   //Ethernet
   Ethernet.begin(MAC);
   delay(1500);
@@ -113,7 +122,6 @@ void setup() {
   SerialPrint("STM32 starting ......");
 
   //READ total walues from EEPROM from EEPROM
-  
 }
 
 // ------------------ LOOP ---------------------------------------------------------
@@ -162,11 +170,11 @@ void L3_dishwasher_interr(){
 }
 // read data from EEPROM return consumption
 double readEEprom(uint16_t memory_address){
-  double energy;
+  float energy;
   uint8_t buffer[4];
   ee.readBlock(memory_address, buffer, 4);
   memcpy((void *)&energy, buffer,4);
-  return energy; 
+  return (int)(energy * 100 + 0.5)/100.0;
 }
 // write consumprion to EEPROM
 void updateEEprom(uint16_t memory_address, double energy){
@@ -195,6 +203,7 @@ void updateTotalConsumption(){
   updateEEprom(EEPROM_ADDRESS[4], l2_refri.getTotalConsumption());
   updateEEprom(EEPROM_ADDRESS[5], l3_dish.getTotalConsumption());
 }
+
 //MQTT - send data
 void sendData(){
   time = millis();
@@ -227,7 +236,10 @@ void sendData(){
   payload["tOven"] = l1_oven.getTotalConsumption();
   payload["tRefri"] = l2_refri.getTotalConsumption();
   payload["tDish"] = l3_dish.getTotalConsumption();
+
   payload["con_failed"] = connection_failed;
+
+
 
   serializeJson(payload, buffer);
   mqttClient.publish(POWER_TOPIC, buffer);
@@ -317,26 +329,32 @@ void callback(char* topic, byte* payload, unsigned int length) {
       payload[length] = '\0';
       String s = String((char*)payload);
       l1.setTotalConsumption(s.toDouble());
+      updateTotalConsumption();
   } else if(strcmp(topic,SET_L2_TOTAL_TOPIC)==0){
       payload[length] = '\0';
       String s = String((char*)payload);
       l2.setTotalConsumption(s.toDouble());
+      updateTotalConsumption();
   } else if(strcmp(topic,SET_L3_TOTAL_TOPIC)==0){
       payload[length] = '\0';
       String s = String((char*)payload);
       l3.setTotalConsumption(s.toDouble());
+      updateTotalConsumption();
   } else if(strcmp(topic,SET_OVEN_TOTAL_TOPIC)==0){
       payload[length] = '\0';
       String s = String((char*)payload);
       l1_oven.setTotalConsumption(s.toDouble());
+      updateTotalConsumption();
   } else if(strcmp(topic,SET_REFRI_TOTAL_TOPIC)==0){
       payload[length] = '\0';
       String s = String((char*)payload);
       l2_refri.setTotalConsumption(s.toDouble());
+      updateTotalConsumption();
   } else if(strcmp(topic,SET_DISH_TOTAL_TOPIC)==0){
       payload[length] = '\0';
       String s = String((char*)payload);
       l3_dish.setTotalConsumption(s.toDouble());
+      updateTotalConsumption();
   } else if(strcmp(topic,SET_INTERVAL_TOPIC)==0){
       payload[length] = '\0';
       String s = String((char*)payload);

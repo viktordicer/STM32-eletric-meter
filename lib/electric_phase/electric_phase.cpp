@@ -1,6 +1,5 @@
 
 #include "electric_phase.h"
-# include <math.h>
 
 ElectricPhase::ElectricPhase(int interrupt_pin){
   this->interrupt_pin = interrupt_pin;
@@ -48,10 +47,10 @@ double ElectricPhase::getPower(uint32_t dt){
 }
 // Get total consumption one decimal place
 double ElectricPhase::getTotalConsumption(){
-  return round(this->total_consumption*10)/10;
+  return (int)(this->total_consumption * 10 + 0.5)/10.0;
 }
 
-// Set total consumprion after restart
+// Set total consumption after restart
 void ElectricPhase::setTotalConsumption(double value){
   this->total_consumption = value;
 }

@@ -1,6 +1,7 @@
 //-------------HARDWARE VARIABLES
 //ETHERNET
 #define RESET_PIN               PA0 // Reset of W5500
+#define GREEN_LED               PC13
 
 //Water flow sensors
 #define INTERRUPT_L1              PB15 // internal circuit flow sensor
